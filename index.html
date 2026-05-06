@@ -176,17 +176,41 @@
   .popup-meta { font-size:13px; font-weight:600; color:var(--caramel); margin-top:6px; }
   .popup-safety { font-size:12px; font-weight:600; margin-top:5px; padding:3px 8px; border-radius:6px; display:inline-block; }
 
-  .mobile-toggle { display:none; position:fixed; bottom:24px; right:24px; z-index:999; background:var(--espresso); color:var(--caramel); border:none; border-radius:50px; padding:14px 22px; font-family:'Playfair Display',serif; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.3); align-items:center; gap:8px; }
+  .mobile-toggle { display:none; position:fixed; bottom:20px; right:20px; z-index:999; background:var(--espresso); color:var(--caramel); border:none; border-radius:50px; padding:12px 20px; font-family:'Playfair Display',serif; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.3); align-items:center; gap:8px; }
 
   @media (max-width:768px) {
-    .app-body { flex-direction:column; height:auto; overflow:visible; }
-    .sidebar { width:100%; min-width:0; height:auto; border-right:none; border-bottom:1px solid var(--steam); }
-    .sidebar-scroll { overflow-y:auto; max-height:60vh; }
-    #map-container { height:50vh; min-height:300px; }
+    .app-body {
+      flex-direction:column;
+      height:calc(100vh - 56px);
+      overflow:hidden;
+      position:relative;
+    }
+    /* Sidebar takes full screen on mobile */
+    .sidebar {
+      width:100%; min-width:0;
+      height:calc(100vh - 56px);
+      border-right:none; border-bottom:none;
+      position:absolute; top:0; left:0; right:0; bottom:0;
+      z-index:10;
+    }
+    .sidebar-scroll {
+      overflow-y:auto;
+      height:calc(100vh - 56px - 70px); /* leave room for toggle button */
+      max-height:none;
+    }
+    /* Map takes full screen on mobile */
+    #map-container {
+      position:absolute; top:0; left:0; right:0; bottom:0;
+      height:calc(100vh - 56px);
+      z-index:5;
+    }
     .mobile-toggle { display:flex; }
+    /* Map view: hide sidebar, show map */
     .app-body.map-view .sidebar { display:none; }
+    .app-body.map-view #map-container { z-index:10; }
+    /* List view: show sidebar, hide map */
     .app-body.list-view #map-container { display:none; }
-    .map-legend { bottom:60px; }
+    .map-legend { bottom:70px; right:10px; }
   }
 </style>
 </head>
@@ -819,7 +843,7 @@ function setMobileView(v) {
   body.classList.remove('map-view','list-view');
   body.classList.add(v==='map'?'map-view':'list-view');
   document.getElementById('mobileToggle').textContent=v==='map'?'📋 List':'🗺 Map';
-  if (v==='map') setTimeout(()=>map.invalidateSize(),100);
+  if (v==='map') setTimeout(()=>{ if(map) map.invalidateSize(); },150);
 }
 
 // ═══════════════════════════════════════════════
