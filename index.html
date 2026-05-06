@@ -406,7 +406,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v2';
+const CACHE_KEY = 'marianas_osm_v3';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -486,9 +486,14 @@ function toggleSafetyOverlay() {
 
 // ═══════════════════════════════════════════════
 // OVERPASS API — fetch NJ cafes & bakeries
+// Uses NJ state boundary (area filter) to avoid
+// NYC, PA, and DE border bleed
 // ═══════════════════════════════════════════════
-// NJ bounding box — tightened to reduce PA/NY border bleed
-const NJ_BBOX = '38.92,-75.56,41.36,-73.90';
+// NJ bounding box (conservative — area filter does the real work)
+const NJ_BBOX = '38.92,-75.56,41.36,-74.01';
+
+// Known non-NJ cities/addresses to exclude
+const NON_NJ_CITIES = ['new york','brooklyn','bronx','queens','staten island','philadelphia','wilmington','newark, de','yonkers','white plains','conshohocken','lansdale','doylestown','media, pa'];
 
 async function fetchOverpass(query) {
   const url = 'https://overpass-api.de/api/interpreter';
@@ -502,14 +507,16 @@ async function fetchOverpass(query) {
 }
 
 function overpassQuery(bbox) {
-  return `[out:json][timeout:25];
+  // area[name="New Jersey"] restricts results to NJ's admin boundary
+  return `[out:json][timeout:30];
+area["name"="New Jersey"]["admin_level"="4"]->.nj;
 (
-  node["amenity"="cafe"](${bbox});
-  node["amenity"="bakery"](${bbox});
-  node["shop"="bakery"](${bbox});
-  way["amenity"="cafe"](${bbox});
-  way["amenity"="bakery"](${bbox});
-  way["shop"="bakery"](${bbox});
+  node["amenity"="cafe"](area.nj);
+  node["amenity"="bakery"](area.nj);
+  node["shop"="bakery"](area.nj);
+  way["amenity"="cafe"](area.nj);
+  way["amenity"="bakery"](area.nj);
+  way["shop"="bakery"](area.nj);
 );
 out center tags;`;
 }
@@ -564,8 +571,11 @@ async function loadNJPlaces() {
     const deduped = [];
     places.forEach(p => {
       if (deduped.length >= 500) return;
-      // Extra filter: must be in NJ (rough lon/lat bounds)
-      if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -73.89) return;
+      // Hard longitude cutoff — NJ's eastern border is ~-73.89 but NYC starts at -74.01
+      if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -74.01) return;
+      // Exclude known non-NJ cities that bleed across borders
+      const city = (p.address||'').toLowerCase();
+      if (NON_NJ_CITIES.some(c => city.includes(c))) return;
       const dup = deduped.find(d => d.name===p.name && haversine(d.lat,d.lng,p.lat,p.lng)<0.3);
       if (!dup) deduped.push(p);
     });
