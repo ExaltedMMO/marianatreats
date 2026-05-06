@@ -2,11 +2,9 @@ name = "marianas-treats-yelp"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
-# Routes the worker to handle /api/yelp on your Pages domain
-[[routes]]
-pattern = "marianastreats.pages.dev/api/yelp"
-zone_name = "marianastreats.pages.dev"
-
-# Set your Yelp key as a secret (never put the actual key here):
-# Run: wrangler secret put YELP_API_KEY
-# Then paste your key when prompted.
+# After deploying, connect this worker to your Pages site via the dashboard:
+# Workers & Pages → marianas-treats → Settings → Functions → KV namespace bindings
+# OR simply add the worker route manually in the Worker's Triggers tab.
+#
+# Set your Yelp key as a secret — run this after deploying:
+#   wrangler secret put YELP_API_KEY
