@@ -468,7 +468,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v3';
+const CACHE_KEY = 'marianas_osm_v4';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -569,16 +569,23 @@ async function fetchOverpass(query) {
 }
 
 function overpassQuery(bbox) {
-  // area[name="New Jersey"] restricts results to NJ's admin boundary
   return `[out:json][timeout:30];
 area["name"="New Jersey"]["admin_level"="4"]->.nj;
 (
   node["amenity"="cafe"](area.nj);
   node["amenity"="bakery"](area.nj);
   node["shop"="bakery"](area.nj);
+  node["shop"="pastry"](area.nj);
+  node["shop"="confectionery"](area.nj);
+  node["shop"="coffee"](area.nj);
+  node["craft"="bakery"](area.nj);
   way["amenity"="cafe"](area.nj);
   way["amenity"="bakery"](area.nj);
   way["shop"="bakery"](area.nj);
+  way["shop"="pastry"](area.nj);
+  way["shop"="confectionery"](area.nj);
+  way["shop"="coffee"](area.nj);
+  way["craft"="bakery"](area.nj);
 );
 out center tags;`;
 }
@@ -591,23 +598,24 @@ function osmToPlace(el) {
   const name = t.name||t['name:en']||'';
   if (!name || isChain(name)) return null;
 
-  const isCafe = (t.amenity==='cafe') || (t.cuisine||'').includes('coffee');
+  const isCafe = (t.amenity==='cafe') || (t.shop==='coffee') ||
+                 (t.cuisine||'').toLowerCase().includes('coffee');
   const type = isCafe ? 'cafe' : 'bakery';
 
-  // Build OSM rating proxy from review count tags
-  const stars = parseFloat(t['stars']||t['rating']||'0')||0;
+  const street = [t['addr:housenumber'], t['addr:street'] || t['addr:place']].filter(Boolean).join(' ');
+  const city   = t['addr:city'] || t['addr:town'] || t['addr:village'] || t['addr:suburb'] || t['addr:hamlet'] || '';
+  const address = [street, city].filter(Boolean).join(', ');
 
   return {
     id: `${el.type}/${el.id}`,
     name,
     type,
     lat, lng,
-    address: [t['addr:housenumber'], t['addr:street'], t['addr:city']].filter(Boolean).join(', '),
+    address,
     website: t.website||t['contact:website']||null,
     phone: t.phone||t['contact:phone']||null,
     opening_hours: t.opening_hours||null,
     cuisine: t.cuisine||null,
-    stars,
   };
 }
 
@@ -753,14 +761,28 @@ function renderCards(places, isRoute) {
 // ═══════════════════════════════════════════════
 // FOCUS PLACE
 // ═══════════════════════════════════════════════
+let isFocusingPlace = false;
+
 function focusPlace(id, isRoute) {
   const pool = isRoute ? routePlaces : allPlaces;
   const place = pool.find(p=>p.id===id);
   if (!place) return;
+  isFocusingPlace = true;
   map.setView([place.lat, place.lng], 14);
   const marker = placeMarkers.find(m=>m.placeId===id);
   if (marker) marker.openPopup();
-  if (window.innerWidth<=768) setMobileView('map');
+  if (window.innerWidth<=768) {
+    setMobileView('map');
+    // After switching to map view, pan to the place (fitBounds in setMobileView may override)
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        map.invalidateSize({ animate:false });
+        map.setView([place.lat, place.lng], 14, { animate:false });
+        if (marker) marker.openPopup();
+        isFocusingPlace = false;
+      });
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -920,12 +942,12 @@ function setMobileView(v) {
     requestAnimationFrame(()=>{
       requestAnimationFrame(()=>{
         map.invalidateSize({ animate:false });
-        if (routeLayer) {
-          // Zoom to show the active route
-          map.fitBounds(routeLayer.getBounds(), { padding:[40,40], animate:false });
-        } else {
-          // No route — show all of NJ
-          map.fitBounds(NJ_BOUNDS, { padding:[20,20], animate:false });
+        if (!isFocusingPlace) {
+          if (routeLayer) {
+            map.fitBounds(routeLayer.getBounds(), { padding:[40,40], animate:false });
+          } else {
+            map.fitBounds(NJ_BOUNDS, { padding:[20,20], animate:false });
+          }
         }
       });
     });
