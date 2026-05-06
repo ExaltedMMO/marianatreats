@@ -1,13 +1,3 @@
-# Never commit the built output (contains the real API key)
-dist/
-
-# Local env file
-.env
-.env.local
-
-# Node
-node_modules/
-
-# OS
 .DS_Store
 Thumbs.db
+node_modules/
