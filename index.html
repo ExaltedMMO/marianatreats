@@ -412,7 +412,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v1';
+const CACHE_KEY = 'marianas_osm_v2';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -460,7 +460,7 @@ async function fetchYelpRating(place) {
       lat:  place.lat,
       lng:  place.lng,
     });
-    const res = await fetch(`https://marianatreats.exaltedmmo.workers.dev/?${params}`);
+    const res = await fetch(`https://muddy-sound-edba.exaltedmmo.workers.dev/?${params}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (data && data.rating != null) {
@@ -573,8 +573,8 @@ function toggleSafetyOverlay() {
 // ═══════════════════════════════════════════════
 // OVERPASS API — fetch NJ cafes & bakeries
 // ═══════════════════════════════════════════════
-// NJ bounding box: S=38.9, N=41.4, W=-75.6, E=-73.9
-const NJ_BBOX = '38.9,-75.6,41.4,-73.9';
+// NJ bounding box — tightened to reduce PA/NY border bleed
+const NJ_BBOX = '38.92,-75.56,41.36,-73.90';
 
 async function fetchOverpass(query) {
   const url = 'https://overpass-api.de/api/interpreter';
@@ -646,9 +646,12 @@ async function loadNJPlaces() {
       .map(osmToPlace)
       .filter(Boolean);
 
-    // Deduplicate by name+proximity
+    // Deduplicate by name+proximity and cap at 500 results
     const deduped = [];
     places.forEach(p => {
+      if (deduped.length >= 500) return;
+      // Extra filter: must be in NJ (rough lon/lat bounds)
+      if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -73.89) return;
       const dup = deduped.find(d => d.name===p.name && haversine(d.lat,d.lng,p.lat,p.lng)<0.3);
       if (!dup) deduped.push(p);
     });
