@@ -258,6 +258,13 @@
             <span class="slider"></span>
           </label>
         </div>
+        <div class="toggle-row" style="border-top:none;padding-top:2px;">
+          <span class="toggle-label">🚫 Avoid Tolls</span>
+          <label class="toggle">
+            <input type="checkbox" id="avoidTolls">
+            <span class="slider"></span>
+          </label>
+        </div>
         <button class="btn-route" id="routeBtn" onclick="findRoute()">
           <span>Find Stops Along Route</span>
         </button>
@@ -465,6 +472,9 @@ const NJ_CENTER = [40.1326, -74.6672];
 // ═══════════════════════════════════════════════
 // MAP INIT
 // ═══════════════════════════════════════════════
+// NJ bounds for default mobile view
+const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.90]];
+
 function initMap() {
   map = L.map('map', { zoomControl:true, scrollWheelZoom:true }).setView(NJ_CENTER, 8);
 
@@ -472,6 +482,11 @@ function initMap() {
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom:19,
   }).addTo(map);
+
+  // On mobile, fit to NJ bounds so the whole state is visible
+  if (window.innerWidth <= 768) {
+    map.fitBounds(NJ_BOUNDS, { padding:[10,10] });
+  }
 
   drawSafetyOverlay();
   loadNJPlaces();
@@ -721,7 +736,7 @@ function focusPlace(id, isRoute) {
   const pool = isRoute ? routePlaces : allPlaces;
   const place = pool.find(p=>p.id===id);
   if (!place) return;
-  map.setView([place.lat, place.lng], 16);
+  map.setView([place.lat, place.lng], 14);
   const marker = placeMarkers.find(m=>m.placeId===id);
   if (marker) marker.openPopup();
   if (window.innerWidth<=768) setMobileView('map');
@@ -733,18 +748,26 @@ function focusPlace(id, isRoute) {
 let geocodeTimers={start:null,end:null};
 let geocodeResults={start:[],end:[]};
 
-// Clean verbose Nominatim display names down to "City, State" or "Place, City, State"
-function cleanAddress(displayName) {
-  const parts = displayName.split(',').map(p => p.trim());
-  // Drop known noise: county names, country, zip codes, long road descriptions
-  const noise = ['United States', 'USA', 'County', 'Township', 'Borough', 'Municipality'];
-  const filtered = parts.filter(p =>
-    p.length > 0 &&
-    !noise.some(n => p.includes(n)) &&
-    !/^\d{5}$/.test(p) // zip codes
-  );
-  // Keep at most 3 parts: name, city, state
-  return filtered.slice(0, 3).join(', ');
+// Build a clean address from Nominatim's addressdetails object
+function cleanAddress(r) {
+  const a = r.address || {};
+  const parts = [
+    // House number + street
+    [a.house_number, a.road].filter(Boolean).join(' '),
+    // City (try multiple fields Nominatim uses)
+    a.city || a.town || a.village || a.suburb || a.hamlet || '',
+    // State + postcode
+    [a.state, a.postcode].filter(Boolean).join(' '),
+  ].filter(Boolean);
+
+  // Fallback: trim the display_name if no addressdetails
+  if (parts.length < 2) {
+    return r.display_name.split(',')
+      .map(p => p.trim())
+      .filter(p => p && !['United States','USA'].includes(p) && !/County|Township|Borough|Municipality/.test(p))
+      .slice(0, 3).join(', ');
+  }
+  return parts.join(', ');
 }
 
 async function geocodeInput(which) {
@@ -755,12 +778,14 @@ async function geocodeInput(which) {
   geocodeTimers[which] = setTimeout(async()=>{
     try {
       const q = encodeURIComponent(input+', New Jersey, USA');
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&countrycodes=us`,
-        { headers:{'Accept-Language':'en'} });
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&countrycodes=us&addressdetails=1`,
+        { headers:{'Accept-Language':'en'} }
+      );
       const data = await res.json();
       geocodeResults[which] = data;
       list.innerHTML = data.map((r,i)=>
-        `<div class="autocomplete-item" onclick="selectGeocode('${which}',${i})">${cleanAddress(r.display_name)}</div>`
+        `<div class="autocomplete-item" onclick="selectGeocode('${which}',${i})">${cleanAddress(r)}</div>`
       ).join('');
       list.style.display = data.length?'block':'none';
     } catch(e){}
@@ -769,7 +794,7 @@ async function geocodeInput(which) {
 
 function selectGeocode(which, idx) {
   const r = geocodeResults[which][idx];
-  document.getElementById(which+'Input').value = cleanAddress(r.display_name);
+  document.getElementById(which+'Input').value = cleanAddress(r);
   document.getElementById(which+'List').style.display='none';
   if (which==='start') startCoords=[parseFloat(r.lat),parseFloat(r.lon)];
   else endCoords=[parseFloat(r.lat),parseFloat(r.lon)];
@@ -800,8 +825,10 @@ async function findRoute() {
   btn.disabled=true;
 
   try {
+    const avoidTolls = document.getElementById('avoidTolls').checked;
+    const exclude = avoidTolls ? '&exclude=toll' : '';
     // OSRM public API
-    const url=`https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`;
+    const url=`https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson${exclude}`;
     const res=await fetch(url);
     const data=await res.json();
     if (data.code!=='Ok') throw new Error('Route not found');
