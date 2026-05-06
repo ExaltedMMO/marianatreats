@@ -13,7 +13,7 @@
  */
 
 const CORS = {
-  'Access-Control-Allow-Origin':  'https://marianastreats.pages.dev',
+  'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
@@ -27,11 +27,7 @@ export default {
 
     const url = new URL(request.url);
 
-    // Only handle /api/yelp
-    if (!url.pathname.endsWith('/api/yelp')) {
-      return new Response('Not found', { status: 404 });
-    }
-
+    // Handle any path — worker only does one thing
     const name = url.searchParams.get('name');
     const lat  = url.searchParams.get('lat');
     const lng  = url.searchParams.get('lng');

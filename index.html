@@ -460,7 +460,7 @@ async function fetchYelpRating(place) {
       lat:  place.lat,
       lng:  place.lng,
     });
-    const res = await fetch(`/api/yelp?${params}`);
+    const res = await fetch(`https://marianatreats.exaltedmmo.workers.dev/api/yelp?${params}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (data && data.rating != null) {
