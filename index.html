@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mariana's Treats</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -183,9 +183,10 @@
   .mobile-toggle { display:none; position:fixed; bottom:20px; right:20px; z-index:999; background:var(--espresso); color:var(--caramel); border:none; border-radius:50px; padding:12px 20px; font-family:'Playfair Display',serif; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.3); align-items:center; gap:8px; }
 
   @media (max-width:768px) {
-    input, select, textarea {
-      font-size: 16px !important;
-    }
+    /* Prevent iOS auto-zoom on input focus — must be 16px+ */
+    input, select, textarea { font-size:16px !important; }
+
+    .app-body {
       flex-direction:column;
       height:calc(100dvh - 56px);
       overflow:hidden;
@@ -193,19 +194,19 @@
     }
     .sidebar {
       width:100%; min-width:0;
-      height:calc(100dvh - 56px);
+      height:100%;
       border-right:none; border-bottom:none;
       position:absolute; top:0; left:0; right:0; bottom:0;
       z-index:10;
     }
     .sidebar-scroll {
       overflow-y:auto;
-      height:calc(100dvh - 56px - 72px);
+      height:calc(100% - 72px);
       max-height:none;
     }
     #map-container {
       position:absolute; top:0; left:0; right:0; bottom:0;
-      height:calc(100dvh - 56px);
+      height:100%;
       z-index:5;
     }
     .mobile-toggle { display:flex; }
@@ -732,6 +733,20 @@ function focusPlace(id, isRoute) {
 let geocodeTimers={start:null,end:null};
 let geocodeResults={start:[],end:[]};
 
+// Clean verbose Nominatim display names down to "City, State" or "Place, City, State"
+function cleanAddress(displayName) {
+  const parts = displayName.split(',').map(p => p.trim());
+  // Drop known noise: county names, country, zip codes, long road descriptions
+  const noise = ['United States', 'USA', 'County', 'Township', 'Borough', 'Municipality'];
+  const filtered = parts.filter(p =>
+    p.length > 0 &&
+    !noise.some(n => p.includes(n)) &&
+    !/^\d{5}$/.test(p) // zip codes
+  );
+  // Keep at most 3 parts: name, city, state
+  return filtered.slice(0, 3).join(', ');
+}
+
 async function geocodeInput(which) {
   const input = document.getElementById(which+'Input').value.trim();
   const list  = document.getElementById(which+'List');
@@ -745,7 +760,7 @@ async function geocodeInput(which) {
       const data = await res.json();
       geocodeResults[which] = data;
       list.innerHTML = data.map((r,i)=>
-        `<div class="autocomplete-item" onclick="selectGeocode('${which}',${i})">${r.display_name}</div>`
+        `<div class="autocomplete-item" onclick="selectGeocode('${which}',${i})">${cleanAddress(r.display_name)}</div>`
       ).join('');
       list.style.display = data.length?'block':'none';
     } catch(e){}
@@ -754,7 +769,7 @@ async function geocodeInput(which) {
 
 function selectGeocode(which, idx) {
   const r = geocodeResults[which][idx];
-  document.getElementById(which+'Input').value = r.display_name.split(',').slice(0,2).join(',').trim();
+  document.getElementById(which+'Input').value = cleanAddress(r.display_name);
   document.getElementById(which+'List').style.display='none';
   if (which==='start') startCoords=[parseFloat(r.lat),parseFloat(r.lon)];
   else endCoords=[parseFloat(r.lat),parseFloat(r.lon)];
