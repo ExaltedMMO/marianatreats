@@ -502,6 +502,7 @@ const NJ_CENTER = [40.1326, -74.6672];
 // ═══════════════════════════════════════════════
 // NJ bounds for default mobile view
 const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.90]];
+let hasViewedMap = false;
 
 function initMap() {
   map = L.map('map', { zoomControl:true, scrollWheelZoom:true }).setView(NJ_CENTER, 8);
@@ -510,11 +511,6 @@ function initMap() {
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom:19,
   }).addTo(map);
-
-  // On mobile, fit to NJ bounds so the whole state is visible
-  if (window.innerWidth <= 768) {
-    map.fitBounds(NJ_BOUNDS, { padding:[10,10] });
-  }
 
   drawSafetyOverlay();
   loadNJPlaces();
@@ -785,15 +781,15 @@ function cleanAddress(r) {
     [a.house_number, a.road].filter(Boolean).join(' '),
     // City (try multiple fields Nominatim uses)
     a.city || a.town || a.village || a.suburb || a.hamlet || '',
-    // State + postcode
-    [a.state, a.postcode].filter(Boolean).join(' '),
+    // State only — no zip code
+    a.state || '',
   ].filter(Boolean);
 
   // Fallback: trim the display_name if no addressdetails
   if (parts.length < 2) {
     return r.display_name.split(',')
       .map(p => p.trim())
-      .filter(p => p && !['United States','USA'].includes(p) && !/County|Township|Borough|Municipality/.test(p))
+      .filter(p => p && !['United States','USA'].includes(p) && !/County|Township|Borough|Municipality/.test(p) && !/^\d{5}$/.test(p))
       .slice(0, 3).join(', ');
   }
   return parts.join(', ');
@@ -926,11 +922,11 @@ function setMobileView(v) {
     setTimeout(()=>{
       if (!map) return;
       map.invalidateSize();
-      // If no route is active, fit to all of NJ
+      // If no route is active, always fit to all of NJ
       if (!routeLayer) {
-        map.fitBounds(NJ_BOUNDS, { padding:[10,10], animate:false });
+        setTimeout(()=> map.fitBounds(NJ_BOUNDS, { padding:[20,20] }), 50);
       }
-    }, 150);
+    }, 200);
   }
 }
 
