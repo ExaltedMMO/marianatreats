@@ -737,7 +737,7 @@ function renderCards(places, isRoute) {
         <div class="score-label">${sz.name} area</div>
       </div>`:'';
     const detour = isRoute&&p.detourMins!=null
-      ?`<div class="detour-badge">+${p.detourMins} min detour</div>`:'';
+      ?`<div class="detour-badge">${p.detourEstimated?'~':'+'}${p.detourMins} min detour${p.detourEstimated?' (est.)':''}</div>`:'';
     const tags = [
       p.opening_hours?`<span class="tag">🕐 ${p.opening_hours.split(';')[0]}</span>`:'',
       p.website?`<span class="tag"><a href="${p.website}" target="_blank" style="color:inherit;text-decoration:none;">🌐 Website</a></span>`:'',
@@ -890,8 +890,10 @@ async function findRoute() {
     routeLayer=L.polyline(coords,{color:'#C4873A',weight:5,opacity:0.8}).addTo(map);
     map.fitBounds(routeLayer.getBounds(), {padding:[40,40]});
 
-    // Find places along route
-    findPlacesAlongRoute(coords);
+    // Find places along route — show progress while OSRM computes real detours
+    btn.innerHTML='<span class="loading-spinner"></span> Finding stops…';
+    updateList('<div class="empty-state"><div class="icon">⏳</div><p>Calculating real detour times…</p></div>');
+    await findPlacesAlongRoute(coords, route.duration);
   } catch(e) {
     errEl.textContent='Could not calculate route. Try selecting locations from the dropdown.';
     errEl.style.display='block';
@@ -901,20 +903,95 @@ async function findRoute() {
   }
 }
 
-function findPlacesAlongRoute(routeCoords) {
-  // Sample 3 points from route
-  const pts=[0, Math.floor(routeCoords.length/2), routeCoords.length-1].map(i=>routeCoords[i]);
+// Tunables for the detour search
+const PREFILTER_RADIUS_KM = 8;   // crow-flies cutoff before we ask OSRM
+const MAX_CANDIDATES      = 30;  // hard cap on places sent to OSRM Table
+const MAX_DETOUR_MINS     = 30;  // hide results with absurd real-world detours
 
-  // Score all loaded places by distance to route
-  const withDetour = allPlaces.map(p=>{
-    let minD=Infinity;
-    routeCoords.forEach(rc=>{ const d=haversine(p.lat,p.lng,rc[0],rc[1]); if(d<minD)minD=d; });
-    return {...p, detourMins: Math.round(minD*2*1.5+3), distFromRoute:minD};
-  });
+async function findPlacesAlongRoute(routeCoords, baseDurationSec) {
+  // ── 1. Prefilter by crow-flies distance to the route polyline ──
+  const candidates = allPlaces.map(p => {
+    let minD = Infinity;
+    routeCoords.forEach(rc => {
+      const d = haversine(p.lat, p.lng, rc[0], rc[1]);
+      if (d < minD) minD = d;
+    });
+    return { ...p, distFromRoute: minD };
+  })
+  .filter(p => p.distFromRoute < PREFILTER_RADIUS_KM)
+  .filter(p => currentFilter === 'all' || p.type === currentFilter)
+  .sort((a, b) => a.distFromRoute - b.distFromRoute)
+  .slice(0, MAX_CANDIDATES);
 
-  routePlaces = withDetour.filter(p=>p.distFromRoute<8).sort((a,b)=>a.detourMins-b.detourMins);
+  if (!candidates.length) {
+    routePlaces = [];
+    dropMarkers([]);
+    renderCards([], true);
+    return;
+  }
+
+  // ── 2. Fall back to estimate if Table call fails ──
+  const estimateDetour = (km) => Math.round((km * 2.2 * 2 / 35) * 60 + 4);
+
+  try {
+    const real = await realDetoursViaTable(candidates, baseDurationSec);
+    routePlaces = real
+      .filter(p => p.detourMins != null && p.detourMins <= MAX_DETOUR_MINS)
+      .sort((a, b) => a.detourMins - b.detourMins);
+  } catch(e) {
+    // OSRM Table failed — use heuristic so the user still gets results
+    routePlaces = candidates
+      .map(p => ({ ...p, detourMins: estimateDetour(p.distFromRoute), detourEstimated: true }))
+      .sort((a, b) => a.detourMins - b.detourMins);
+  }
+
   dropMarkers(routePlaces);
   renderCards(routePlaces, true);
+}
+
+// One OSRM Table call to get start→place and place→end durations for all candidates,
+// then detour = (start→place + place→end) − baseline
+async function realDetoursViaTable(candidates, baseDurationSec) {
+  // Coords: [start, p0, p1, ..., pN, end]
+  const coords = [
+    `${startCoords[1]},${startCoords[0]}`,
+    ...candidates.map(p => `${p.lng},${p.lat}`),
+    `${endCoords[1]},${endCoords[0]}`,
+  ].join(';');
+
+  const startIdx = 0;
+  const endIdx   = candidates.length + 1;
+  const placeIdxs = candidates.map((_, i) => i + 1);
+
+  // sources = start + all places; destinations = all places + end
+  // This gives us: row 0 = start→places (and start→end at last col),
+  //                rows 1..N = place_i→end (last col)
+  const sources      = [startIdx, ...placeIdxs].join(';');
+  const destinations = [...placeIdxs, endIdx].join(';');
+
+  const url = `https://router.project-osrm.org/table/v1/driving/${coords}` +
+              `?sources=${sources}&destinations=${destinations}&annotations=duration`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Table HTTP ' + res.status);
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.durations) throw new Error('Table failed');
+
+  // data.durations layout (rows = sources, cols = destinations):
+  //   row 0       → [start→p0, start→p1, ..., start→pN, start→end]
+  //   row i (1..N)→ [pi→p0,    pi→p1,    ..., pi→pN,    pi→end   ]
+  const startRow = data.durations[0];
+  const lastCol  = candidates.length; // index of "end" within destinations
+
+  return candidates.map((p, i) => {
+    const startToPlace = startRow[i];
+    const placeToEnd   = data.durations[i + 1]?.[lastCol];
+    if (startToPlace == null || placeToEnd == null) {
+      return { ...p, detourMins: null };
+    }
+    const detourSec = startToPlace + placeToEnd - baseDurationSec;
+    return { ...p, detourMins: Math.max(0, Math.round(detourSec / 60)) };
+  });
 }
 
 // ═══════════════════════════════════════════════
