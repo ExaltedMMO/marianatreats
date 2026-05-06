@@ -500,10 +500,6 @@ const NJ_CENTER = [40.1326, -74.6672];
 // ═══════════════════════════════════════════════
 // MAP INIT
 // ═══════════════════════════════════════════════
-// NJ bounds for default mobile view
-const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.90]];
-let hasViewedMap = false;
-
 function initMap() {
   map = L.map('map', { zoomControl:true, scrollWheelZoom:true }).setView(NJ_CENTER, 8);
 
@@ -911,6 +907,8 @@ function setFilter(filter, btn) {
   dropMarkers(isRoute?routePlaces:allPlaces);
 }
 
+const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.90]];
+
 function toggleMobileView() { setMobileView(mobileView==='map'?'list':'map'); }
 function setMobileView(v) {
   mobileView=v;
@@ -918,15 +916,16 @@ function setMobileView(v) {
   body.classList.remove('map-view','list-view');
   body.classList.add(v==='map'?'map-view':'list-view');
   document.getElementById('mobileToggle').textContent=v==='map'?'📋 List':'🗺 Map';
-  if (v==='map') {
-    setTimeout(()=>{
-      if (!map) return;
-      map.invalidateSize();
-      // If no route is active, always fit to all of NJ
-      if (!routeLayer) {
-        setTimeout(()=> map.fitBounds(NJ_BOUNDS, { padding:[20,20] }), 50);
-      }
-    }, 200);
+  if (v==='map' && map) {
+    // Wait for the container to be visible, then resize + fit NJ
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        map.invalidateSize({ animate:false });
+        if (!routeLayer) {
+          map.fitBounds(NJ_BOUNDS, { padding:[20,20], animate:false });
+        }
+      });
+    });
   }
 }
 
