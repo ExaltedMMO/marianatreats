@@ -468,7 +468,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v4';
+const CACHE_KEY = 'marianas_osm_v5';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -637,10 +637,9 @@ async function loadNJPlaces() {
       .map(osmToPlace)
       .filter(Boolean);
 
-    // Deduplicate by name+proximity and cap at 500 results
+    // Deduplicate by name+proximity (no cap — full NJ coverage for detour search)
     const deduped = [];
     places.forEach(p => {
-      if (deduped.length >= 500) return;
       // Hard longitude cutoff — NJ's eastern border is ~-73.89 but NYC starts at -74.01
       if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -74.01) return;
       // Exclude known non-NJ cities that bleed across borders
