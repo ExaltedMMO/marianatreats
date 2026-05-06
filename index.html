@@ -25,11 +25,15 @@
 
   * { margin:0; padding:0; box-sizing:border-box; }
 
+  html, body {
+    height:100%;
+    overflow:hidden; /* prevents the whole page from scrolling */
+  }
+
   body {
     font-family:'DM Sans',sans-serif;
     background:var(--cream);
     color:var(--espresso);
-    min-height:100vh;
     display:flex;
     flex-direction:column;
   }
@@ -49,7 +53,7 @@
   .osm-badge { background:rgba(196,135,58,0.2); border:1px solid var(--caramel); color:var(--latte); font-size:10px; padding:4px 8px; border-radius:20px; letter-spacing:1px; text-transform:uppercase; }
 
   /* ── LAYOUT ── */
-  .app-body { display:flex; flex:1; overflow:hidden; height:calc(100vh - 56px); }
+  .app-body { display:flex; flex:1; overflow:hidden; height:calc(100vh - 56px); min-height:0; }
 
   /* ── SIDEBAR ── */
   .sidebar {
@@ -181,34 +185,30 @@
   @media (max-width:768px) {
     .app-body {
       flex-direction:column;
-      height:calc(100vh - 56px);
+      height:calc(100dvh - 56px);
       overflow:hidden;
       position:relative;
     }
-    /* Sidebar takes full screen on mobile */
     .sidebar {
       width:100%; min-width:0;
-      height:calc(100vh - 56px);
+      height:calc(100dvh - 56px);
       border-right:none; border-bottom:none;
       position:absolute; top:0; left:0; right:0; bottom:0;
       z-index:10;
     }
     .sidebar-scroll {
       overflow-y:auto;
-      height:calc(100vh - 56px - 70px); /* leave room for toggle button */
+      height:calc(100dvh - 56px - 72px);
       max-height:none;
     }
-    /* Map takes full screen on mobile */
     #map-container {
       position:absolute; top:0; left:0; right:0; bottom:0;
-      height:calc(100vh - 56px);
+      height:calc(100dvh - 56px);
       z-index:5;
     }
     .mobile-toggle { display:flex; }
-    /* Map view: hide sidebar, show map */
     .app-body.map-view .sidebar { display:none; }
     .app-body.map-view #map-container { z-index:10; }
-    /* List view: show sidebar, hide map */
     .app-body.list-view #map-container { display:none; }
     .map-legend { bottom:70px; right:10px; }
   }
