@@ -468,7 +468,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v4';
+const CACHE_KEY = 'marianas_osm_v5';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -568,26 +568,16 @@ async function fetchOverpass(query) {
   return res.json();
 }
 
-function overpassQuery(bbox) {
-  return `[out:json][timeout:30];
-area["name"="New Jersey"]["admin_level"="4"]->.nj;
+function overpassQuery() {
+  // Single compact query using bbox — faster than area filter per element type
+  // NJ bbox: S=38.92, W=-75.56, N=41.36, E=-74.01
+  return `[out:json][timeout:25][bbox:38.92,-75.56,41.36,-74.01];
 (
-  node["amenity"="cafe"](area.nj);
-  node["amenity"="bakery"](area.nj);
-  node["shop"="bakery"](area.nj);
-  node["shop"="pastry"](area.nj);
-  node["shop"="confectionery"](area.nj);
-  node["shop"="coffee"](area.nj);
-  node["craft"="bakery"](area.nj);
-  way["amenity"="cafe"](area.nj);
-  way["amenity"="bakery"](area.nj);
-  way["shop"="bakery"](area.nj);
-  way["shop"="pastry"](area.nj);
-  way["shop"="confectionery"](area.nj);
-  way["shop"="coffee"](area.nj);
-  way["craft"="bakery"](area.nj);
+  nwr["amenity"~"^(cafe|bakery)$"];
+  nwr["shop"~"^(bakery|pastry|confectionery|coffee)$"];
+  nwr["craft"="bakery"];
 );
-out center tags;`;
+out center tags qt;`;
 }
 
 function osmToPlace(el) {
@@ -632,7 +622,7 @@ async function loadNJPlaces() {
   }
 
   try {
-    const data = await fetchOverpass(overpassQuery(NJ_BBOX));
+    const data = await fetchOverpass(overpassQuery());
     const places = (data.elements||[])
       .map(osmToPlace)
       .filter(Boolean);
