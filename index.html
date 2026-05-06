@@ -667,6 +667,7 @@ function dropMarkers(places) {
       <div class="popup-name">${p.type==='cafe'?'☕':'🥐'} ${p.name}</div>
       ${p.address?`<div class="popup-address">${p.address}</div>`:''}
       <div class="popup-meta">${p.type==='cafe'?'Coffee Shop':'Bakery'} · indie</div>
+      ${p.detourMins!=null?`<div style="font-size:12px;font-weight:600;color:#7A8C6E;margin-top:5px;background:rgba(122,140,110,0.1);padding:3px 8px;border-radius:6px;display:inline-block;">+${p.detourMins} min detour</div>`:''}
       ${sz?`<div class="popup-safety" style="background:${tier==='high'?'rgba(45,125,70,0.1)':tier==='med'?'rgba(232,160,32,0.1)':'rgba(192,57,43,0.08)'};color:${tc};">${safetyEmoji(score)} Safety ${score.toFixed(1)}/10 — ${sz.name}</div>`:''}
       ${p.opening_hours?`<div style="font-size:11px;color:#888;margin-top:5px;">🕐 ${p.opening_hours}</div>`:''}
       ${p.website?`<div style="margin-top:6px;"><a href="${p.website}" target="_blank" style="font-size:12px;color:var(--caramel);">🌐 Website</a></div>`:''}
