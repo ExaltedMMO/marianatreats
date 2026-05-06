@@ -917,11 +917,14 @@ function setMobileView(v) {
   body.classList.add(v==='map'?'map-view':'list-view');
   document.getElementById('mobileToggle').textContent=v==='map'?'📋 List':'🗺 Map';
   if (v==='map' && map) {
-    // Wait for the container to be visible, then resize + fit NJ
     requestAnimationFrame(()=>{
       requestAnimationFrame(()=>{
         map.invalidateSize({ animate:false });
-        if (!routeLayer) {
+        if (routeLayer) {
+          // Zoom to show the active route
+          map.fitBounds(routeLayer.getBounds(), { padding:[40,40], animate:false });
+        } else {
+          // No route — show all of NJ
           map.fitBounds(NJ_BOUNDS, { padding:[20,20], animate:false });
         }
       });
