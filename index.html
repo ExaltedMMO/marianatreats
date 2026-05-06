@@ -173,12 +173,40 @@
   .error-msg { background:#FEF2F2; border:1px solid #FECACA; border-radius:10px; padding:12px; color:var(--error); font-size:13px; margin-top:10px; }
 
   /* Custom Leaflet popup styling */
-  .leaflet-popup-content-wrapper { border-radius:12px !important; box-shadow:0 4px 20px rgba(0,0,0,0.15) !important; border:1px solid var(--steam); }
-  .leaflet-popup-content { margin:12px 16px !important; font-family:'DM Sans',sans-serif; }
-  .popup-name { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; color:var(--espresso); }
-  .popup-address { font-size:12px; color:#888; margin-top:3px; }
-  .popup-meta { font-size:13px; font-weight:600; color:var(--caramel); margin-top:6px; }
-  .popup-safety { font-size:12px; font-weight:600; margin-top:5px; padding:3px 8px; border-radius:6px; display:inline-block; }
+  .leaflet-popup-content-wrapper {
+    border-radius:14px !important;
+    box-shadow:0 6px 24px rgba(0,0,0,0.18) !important;
+    border:1px solid var(--steam);
+    min-width:220px !important;
+  }
+  .leaflet-popup-content {
+    margin:14px 16px !important;
+    font-family:'DM Sans',sans-serif;
+    width:220px !important;
+  }
+  .popup-name {
+    font-family:'Playfair Display',serif;
+    font-size:16px; font-weight:700;
+    color:var(--espresso);
+    line-height:1.3;
+    white-space:normal;
+  }
+  .popup-address { font-size:12px; color:#888; margin-top:3px; line-height:1.4; }
+  .popup-meta { font-size:12px; font-weight:600; color:var(--caramel); margin-top:5px; }
+  .popup-safety {
+    font-size:12px; font-weight:600;
+    margin-top:6px; padding:4px 9px;
+    border-radius:7px; display:block;
+    white-space:nowrap;
+  }
+  .popup-detour {
+    display:inline-block;
+    font-size:12px; font-weight:600;
+    color:#7A8C6E;
+    background:rgba(122,140,110,0.1);
+    padding:3px 9px; border-radius:6px;
+    margin-top:6px; white-space:nowrap;
+  }
 
   .mobile-toggle { display:none; position:fixed; bottom:20px; right:20px; z-index:999; background:var(--espresso); color:var(--caramel); border:none; border-radius:50px; padding:12px 20px; font-family:'Playfair Display',serif; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.3); align-items:center; gap:8px; }
 
@@ -665,13 +693,13 @@ function dropMarkers(places) {
     m.placeId = p.id;
     m.bindPopup(`
       <div class="popup-name">${p.type==='cafe'?'☕':'🥐'} ${p.name}</div>
-      ${p.address?`<div class="popup-address">${p.address}</div>`:''}
       <div class="popup-meta">${p.type==='cafe'?'Coffee Shop':'Bakery'} · indie</div>
-      ${p.detourMins!=null?`<div style="font-size:12px;font-weight:600;color:#7A8C6E;margin-top:5px;background:rgba(122,140,110,0.1);padding:3px 8px;border-radius:6px;display:inline-block;">+${p.detourMins} min detour</div>`:''}
+      ${p.address?`<div class="popup-address">${p.address}</div>`:''}
+      ${p.detourMins!=null?`<span class="popup-detour">+${p.detourMins} min detour</span>`:''}
       ${sz?`<div class="popup-safety" style="background:${tier==='high'?'rgba(45,125,70,0.1)':tier==='med'?'rgba(232,160,32,0.1)':'rgba(192,57,43,0.08)'};color:${tc};">${safetyEmoji(score)} Safety ${score.toFixed(1)}/10 — ${sz.name}</div>`:''}
       ${p.opening_hours?`<div style="font-size:11px;color:#888;margin-top:5px;">🕐 ${p.opening_hours}</div>`:''}
-      ${p.website?`<div style="margin-top:6px;"><a href="${p.website}" target="_blank" style="font-size:12px;color:var(--caramel);">🌐 Website</a></div>`:''}
-    `);
+      ${p.website?`<div style="margin-top:7px;"><a href="${p.website}" target="_blank" style="font-size:12px;color:var(--caramel);font-weight:600;">🌐 Website ↗</a></div>`:''}
+    `, { maxWidth: 260 });
     placeMarkers.push(m);
   });
 }
