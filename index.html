@@ -468,7 +468,7 @@ function haversine(a,b,c,d) {
 // ═══════════════════════════════════════════════
 // CACHE
 // ═══════════════════════════════════════════════
-const CACHE_KEY = 'marianas_osm_v5';
+const CACHE_KEY = 'marianas_osm_v7';
 const CACHE_TTL = 24*60*60*1000;
 
 function saveCache(places) {
@@ -551,8 +551,8 @@ function toggleSafetyOverlay() {
 // Uses NJ state boundary (area filter) to avoid
 // NYC, PA, and DE border bleed
 // ═══════════════════════════════════════════════
-// NJ bounding box (conservative — area filter does the real work)
-const NJ_BBOX = '38.92,-75.56,41.36,-74.01';
+// NJ bounding box — correct bounds
+const NJ_BBOX = '38.92,-75.56,41.36,-73.89';
 
 // Known non-NJ cities/addresses to exclude
 const NON_NJ_CITIES = ['new york','brooklyn','bronx','queens','staten island','philadelphia','wilmington','newark, de','yonkers','white plains','conshohocken','lansdale','doylestown','media, pa'];
@@ -569,13 +569,10 @@ async function fetchOverpass(query) {
 }
 
 function overpassQuery() {
-  // Single compact query using bbox — faster than area filter per element type
-  // NJ bbox: S=38.92, W=-75.56, N=41.36, E=-74.01
-  return `[out:json][timeout:25][bbox:38.92,-75.56,41.36,-74.01];
+  return `[out:json][timeout:25][bbox:38.92,-75.56,41.36,-73.89];
 (
   nwr["amenity"~"^(cafe|bakery)$"];
-  nwr["shop"~"^(bakery|pastry|confectionery|coffee)$"];
-  nwr["craft"="bakery"];
+  nwr["shop"="bakery"];
 );
 out center tags qt;`;
 }
@@ -588,8 +585,7 @@ function osmToPlace(el) {
   const name = t.name||t['name:en']||'';
   if (!name || isChain(name)) return null;
 
-  const isCafe = (t.amenity==='cafe') || (t.shop==='coffee') ||
-                 (t.cuisine||'').toLowerCase().includes('coffee');
+  const isCafe = (t.amenity==='cafe') || (t.cuisine||'').toLowerCase().includes('coffee');
   const type = isCafe ? 'cafe' : 'bakery';
 
   const street = [t['addr:housenumber'], t['addr:street'] || t['addr:place']].filter(Boolean).join(' ');
@@ -632,7 +628,7 @@ async function loadNJPlaces() {
     places.forEach(p => {
       if (deduped.length >= 500) return;
       // Hard longitude cutoff — NJ's eastern border is ~-73.89 but NYC starts at -74.01
-      if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -74.01) return;
+      if (p.lat < 38.92 || p.lat > 41.36 || p.lng < -75.56 || p.lng > -73.89) return;
       // Exclude known non-NJ cities that bleed across borders
       const city = (p.address||'').toLowerCase();
       if (NON_NJ_CITIES.some(c => city.includes(c))) return;
@@ -902,7 +898,7 @@ function findPlacesAlongRoute(routeCoords) {
     return {...p, detourMins: Math.round(minD*2*1.5+3), distFromRoute:minD};
   });
 
-  routePlaces = withDetour.filter(p=>p.distFromRoute<8).sort((a,b)=>a.detourMins-b.detourMins);
+  routePlaces = withDetour.filter(p=>p.distFromRoute<15).sort((a,b)=>a.detourMins-b.detourMins);
   dropMarkers(routePlaces);
   renderCards(routePlaces, true);
 }
@@ -919,7 +915,7 @@ function setFilter(filter, btn) {
   dropMarkers(isRoute?routePlaces:allPlaces);
 }
 
-const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.90]];
+const NJ_BOUNDS = [[38.92, -75.56], [41.36, -73.89]];
 
 function toggleMobileView() { setMobileView(mobileView==='map'?'list':'map'); }
 function setMobileView(v) {
