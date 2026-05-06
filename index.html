@@ -259,7 +259,7 @@
           </label>
         </div>
         <div class="toggle-row" style="border-top:none;padding-top:2px;">
-          <span class="toggle-label">🚫 Avoid Tolls</span>
+          <span class="toggle-label">🚫 Avoid Tolls <span style="font-size:10px;color:#bbb;font-weight:400;">(best effort)</span></span>
           <label class="toggle">
             <input type="checkbox" id="avoidTolls">
             <span class="slider"></span>
@@ -825,15 +825,21 @@ async function findRoute() {
   btn.disabled=true;
 
   try {
-    const avoidTolls = document.getElementById('avoidTolls').checked;
-    const exclude = avoidTolls ? '&exclude=toll' : '';
-    // OSRM public API
-    const url=`https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson${exclude}`;
+    // OSRM public API — note: public server doesn't support exclude=toll
+    // so we note toll preference but can't enforce it via OSRM
+    const url=`https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson&alternatives=true`;
     const res=await fetch(url);
     const data=await res.json();
     if (data.code!=='Ok') throw new Error('Route not found');
 
-    const route=data.routes[0];
+    const avoidTolls = document.getElementById('avoidTolls').checked;
+    // Pick from alternatives: if avoiding tolls, prefer the route with fewer toll road segments
+    // We use route distance as a proxy — toll-free routes tend to be longer
+    let route = data.routes[0];
+    if (avoidTolls && data.routes.length > 1) {
+      // Pick the longest alternative as it's more likely to avoid tolls (going around vs through)
+      route = data.routes.reduce((a,b) => b.distance > a.distance ? b : a);
+    }
     const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
 
     // Draw route on map
@@ -887,7 +893,16 @@ function setMobileView(v) {
   body.classList.remove('map-view','list-view');
   body.classList.add(v==='map'?'map-view':'list-view');
   document.getElementById('mobileToggle').textContent=v==='map'?'📋 List':'🗺 Map';
-  if (v==='map') setTimeout(()=>{ if(map) map.invalidateSize(); },150);
+  if (v==='map') {
+    setTimeout(()=>{
+      if (!map) return;
+      map.invalidateSize();
+      // If no route is active, fit to all of NJ
+      if (!routeLayer) {
+        map.fitBounds(NJ_BOUNDS, { padding:[10,10], animate:false });
+      }
+    }, 150);
+  }
 }
 
 // ═══════════════════════════════════════════════
