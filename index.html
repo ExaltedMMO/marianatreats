@@ -132,7 +132,7 @@
   .stars { color:#F4A100; font-size:13px; letter-spacing:1px; }
   .rating-num { font-size:13px; font-weight:700; color:var(--espresso); }
   .rating-count { font-size:11px; color:#aaa; }
-  .yelp-logo { font-size:10px; color:#d32323; font-weight:700; letter-spacing:0.5px; background:rgba(211,35,35,0.07); padding:2px 6px; border-radius:4px; }
+  .yelp-logo { font-size:10px; color:#f94877; font-weight:700; letter-spacing:0.5px; background:rgba(249,72,119,0.07); padding:2px 6px; border-radius:4px; }
   .rating-pending { font-size:11px; color:#ccc; font-style:italic; margin-top:8px; }
 
   .safety-badge { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:8px; margin-top:9px; }
@@ -438,7 +438,7 @@ function clearCacheAndReload() {
 // Fetched via /api/yelp Cloudflare Worker proxy.
 // Cached per-place in localStorage for 7 days.
 // ═══════════════════════════════════════════════
-const YELP_CACHE_KEY = 'marianas_yelp_v1';
+const YELP_CACHE_KEY = 'marianas_fsq_v1';
 const YELP_TTL = 7*24*60*60*1000;
 
 function loadYelpCache() {
@@ -460,7 +460,7 @@ async function fetchYelpRating(place) {
       lat:  place.lat,
       lng:  place.lng,
     });
-    const res = await fetch(`https://marianatreats.exaltedmmo.workers.dev/api/yelp?${params}`);
+    const res = await fetch(`https://marianatreats.exaltedmmo.workers.dev/?${params}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (data && data.rating != null) {
@@ -483,9 +483,9 @@ async function loadYelpRatingsBatch(places) {
       if (p.yelpRating != null) return; // already loaded
       const data = await fetchYelpRating(p);
       if (data) {
-        p.yelpRating   = data.rating;
-        p.yelpCount    = data.review_count;
-        p.yelpUrl      = data.url;
+        p.yelpRating = data.rating;       // 0–5 scale (converted in worker)
+        p.yelpCount  = data.votes;        // Foursquare total ratings
+        p.yelpUrl    = data.url;
         // Update just this card's rating element without full re-render
         const el = document.getElementById('rating-'+CSS.escape(p.id));
         if (el) el.outerHTML = ratingHtml(p);
@@ -507,7 +507,7 @@ function ratingHtml(p) {
       <span class="stars">${starsStr(p.yelpRating)}</span>
       <span class="rating-num">${p.yelpRating.toFixed(1)}</span>
       <span class="rating-count">(${(p.yelpCount||0).toLocaleString()})</span>
-      <span class="yelp-logo">YELP</span>
+      <span class="yelp-logo">4SQ</span>
     </div>`;
   }
   return `<div class="rating-pending" id="rating-${p.id}">Loading rating…</div>`;
